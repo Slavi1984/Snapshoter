@@ -3,6 +3,8 @@ import requests
 import json
 import os 
 import time
+import threading
+from datetime import date, datetime
 
 
 port_rtsp = 8554
@@ -18,8 +20,6 @@ port_rtsp = api_konfiguracja["rtspAddress"]
 
 
 api_streamy = requests.get('http://localhost:9997/v3/paths/list').json()
-
-
 for i in api_streamy['items']:
     if i["source"]['type'] == 'rtspSession':
         nazwy_rtsp.append(i['name'])
@@ -33,16 +33,41 @@ for i in nazwy_rtsp:
 print(streamy_rtsp)
 
 
+# Ustawienia i interfejs
+
+
+
 # Ustalenie głównej ścieżki zapisu
 
 snapdir = os.getcwd()+'/snapshots'
+
 os.chdir(snapdir)
+if not os.path.exists(snapdir):
+    os.makedirs(snapdir)
+
+
+dir_date = str(date.today())
+if not os.path.exists(dir_date):
+    os.makedirs(dir_date)
+os.chdir(dir_date)
+
+
+dir_time = str(datetime.now()).split()[1]
+dir_time = dir_time[:len(dir_time)-7]
+if not os.path.exists(dir_time):
+    os.makedirs(dir_time)
+os.chdir(dir_time)
+
+
 
 # Nagrywanie streamów
 
 # os.system('ffmpeg -hide_banner -y -loglevel error -rtsp_transport tcp -use_wallclock_as_timestamps 1 -i rtsp://localhost:8554/a -vcodec copy -acodec copy -f segment -reset_timestamps 1 -segment_time 900 -segment_format mkv -segment_atclocktime 1 -strftime 1 test.mkv')
 
+
+
 # pętla snapshotowa
+
 
 for i in range(5):
     time.sleep(1)
