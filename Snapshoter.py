@@ -25,3 +25,10 @@ os.chdir(snapdir)
 for i in range(5):
     time.sleep(1)
     os.system(f'ffmpeg -skip_frame nokey -y -i {streamy_rtsp[0]} -vframes 1 test{i}.jpg')
+
+
+
+#
+#ffmpeg -re -i vid1.mp4 -f rtsp -rtsp_transport tcp  rtsp://localhost:8554/a
+#mediamtx
+#
