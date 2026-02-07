@@ -24,13 +24,13 @@ for i in api_streamy['items']:
     if i["source"]['type'] == 'rtspSession':
         nazwy_rtsp.append(i['name'])
 
-print(nazwy_rtsp)
+#print(nazwy_rtsp)
 
 
 for i in nazwy_rtsp:
     streamy_rtsp.append(f'rtsp://localhost{port_rtsp}/'+i)
 
-print(streamy_rtsp)
+#print(streamy_rtsp)
 
 
 # Ustawienia i interfejs
@@ -68,14 +68,40 @@ os.chdir(dir_time)
 
 # pętla snapshotowa
 
+frame_period = 1
 
-for i in range(5):
-    time.sleep(1)
-    os.system(f'ffmpeg -skip_frame nokey -y -i {streamy_rtsp[0]} -vframes 1 test{i}.jpg')
+def snaphot_loop(kamera,frame_period):
 
+    if not os.path.exists(kamera):
+        os.makedirs(kamera)
+    x = 0
+    while(x<5):
+        time.sleep(frame_period-1)
+        file_name = str(datetime.now()).split()[1].replace('.','-').replace(':','-')+'.jpg'
+        os.system(f'ffmpeg -skip_frame nokey -y -i rtsp://localhost{port_rtsp}/{kamera} -vframes 1 {file_name}')
+        os.system(f'mv {file_name} {kamera}/{file_name}')
+        x += 1
+
+
+
+
+# Uruchomienie równoczesnego zapisu z wielu kamer
+
+daemony_kamerowe = {}
+for i in nazwy_rtsp:
+    daemony_kamerowe[i] = threading.Thread(target=snaphot_loop,args=(i,1))
+    daemony_kamerowe[i].setDaemon(True)  
+
+for i in daemony_kamerowe:
+    daemony_kamerowe[i].start()
+
+
+print(daemony_kamerowe)
+
+time.sleep(10)
 
 
 #
 #ffmpeg -re -i vid1.mp4 -f rtsp -rtsp_transport tcp  rtsp://localhost:8554/a
 #mediamtx
-#r
+#r.replace('.','-')
