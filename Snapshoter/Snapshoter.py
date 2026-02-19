@@ -102,8 +102,8 @@ def snapshotLoop(kamera):
 
 def cameraLoop(kamera):
     print(kamera.film_active)
-    if kamera.film_active==True:
-        print('wtf')
+    if kamera.film_active:
+        print(kamera.film_active)
         if not os.path.exists(kamera.name):
             os.makedirs(kamera.name)
         os.system(f'ffmpeg -hide_banner -y -loglevel error -rtsp_transport tcp -use_wallclock_as_timestamps 1 -i {kamera.camera_path} -vcodec copy -acodec copy -f segment -reset_timestamps 1 -segment_time 900 -segment_format mkv -segment_atclocktime 1 -strftime 1 {kamera.name}/%Y%m%dT%H%M%S.mkv')
@@ -120,15 +120,21 @@ def runSnapshotThreads(cameras,func):
         daemony_kamerowe[i].start()
 
 
+def str_to_bool(s):
+    """Converts `s` to boolean. Assumes `s` is case-insensitive."""
+    return s.lower() in ['true', '1', 't', 'y', 'yes']
+
+
 def readSetting(csv_path):
     csv_dict = {}
     with open(csv_path, 'r') as csv_file:
         csv_reader = csv.reader(csv_file)
         for line in csv_reader:
             csv_dict[line[0]] = {
-            'snapshot_active':line[1],
+            'snapshot_active':str_to_bool(line[1]),
             'snapshot_period':float(line[2]),
-            'film_active':line[3]}  
+            'film_active':str_to_bool(line[3])}  
+    print(csv_dict, 'readS')
     return csv_dict
 
 
@@ -145,12 +151,14 @@ def writeSettingsTocsv(kameras,csv_settings,csv_path):
         for i in kameras:
             csv_writer = csv.writer(csv_file)
             if i in csv_settings:
+                print(csv_settings,'writeSettingsTocsv1 settings')
                 line = [i,csv_settings[i]['snapshot_active'],csv_settings[i]['snapshot_period'],csv_settings[i]['film_active']]
+                print(line,'writeSettingsTocsv line')
                 csv_writer.writerow(line)
             else:
+                print('1')
                 line = [kameras[i].name,kameras[i].snapshot_active,kameras[i].snapshot_period,kameras[i].film_active]
                 csv_writer.writerow(line)
-
 
 
 def settingsFromUser(changes,previous):
@@ -166,15 +174,17 @@ app = typer.Typer()
 
 
 @app.command()
-def display():
+def disp():
     console = Console()
     all_cameras = createRtspCameras(getRtspStreams(),getRtspPort(),CameraRTSP)
     csv_path = os.path.dirname(os.path.abspath(__file__))+'/settings.csv'
     writeSettingsTocsv(all_cameras,readSetting(csv_path),csv_path)
     read_settings = readSetting(csv_path)
+    print(read_settings, 'settings')
     table = Table("Kamera:", "Robienie snapshotów","Czas między snapshotami","Nagrywanie")
     for i in read_settings:
         table.add_row(i,str(read_settings[i]['snapshot_active']),str(read_settings[i]['snapshot_period']),str(read_settings[i]['film_active']))
+    print(read_settings)
     console.print(table)
     print('Folder zapisu snapshotów: ')
     print(os.getcwd()+'/snapshots')
@@ -190,11 +200,10 @@ def run():
     setCameraSettings(all_cameras,readSetting(csv_path))
     runSnapshotThreads(all_cameras,snapshotLoop)
     runSnapshotThreads(all_cameras,cameraLoop)
-    print('hhh')
     time.sleep(4294967)
 
 @app.command()
-def change(
+def ch(
     nazwa: str,
     snapshots: Annotated[bool, typer.Option(prompt=True)],
     odstępy: Annotated[float, typer.Option(prompt=True)],
@@ -203,10 +212,9 @@ def change(
     all_cameras = createRtspCameras(getRtspStreams(),getRtspPort(),CameraRTSP)
     csv_path = os.path.dirname(os.path.abspath(__file__))+'/settings.csv'
     writeSettingsTocsv(all_cameras,readSetting(csv_path),csv_path)
-
+    
     csv_settings=  settingsFromUser({nazwa:{'snapshot_active':snapshots,'snapshot_period':odstępy,'film_active':nagrywanie}},readSetting(csv_path))
     print(csv_settings)
-    print('hello')
     writeSettingsTocsv(all_cameras,csv_settings,csv_path)
 
 
