@@ -15,7 +15,7 @@ class CameraRTSP:
         self.camera_path = f'rtsp://localhost{port_rtsp}/{name}'
         self.snapshot_period = 3.0
         self.snapshot_active = True
-        self.film_active = False
+        self.film_active = True
 
 
 
@@ -43,7 +43,7 @@ def createRtspCameras(streams,port,camera_class):
     return all_cameras
 
 
-#settings = {'abc':[False,5]}
+
 
 def setCameraSnapshotMode(cameras,snaphsot_settings):
     for cam in cameras:
@@ -82,7 +82,7 @@ def changeToSaveDirectory(snapshots_goto_dir):
 
 ## Nagrywanie streamów
 #
-## os.system('ffmpeg -hide_banner -y -loglevel error -rtsp_transport tcp -use_wallclock_as_timestamps 1 -i rtsp://localhost:8554/a -vcodec copy -acodec copy -f segment -reset_timestamps 1 -segment_time 900 -segment_format mkv -segment_atclocktime 1 -strftime 1 test.mkv')
+## os.system('ffmpeg -hide_banner -y -loglevel error -rtsp_transport tcp -use_wallclock_as_timestamps 1 -i rtsp://localhost:8554/c -vcodec libx264 -acodec copy -f segment -reset_timestamps 1 -segment_time 900 -segment_format mp4 -segment_atclocktime 1 -strftime 1 %Y%m%dT%H%M%S.mp4 &')
 
 def makeASnapshot(kamera):
     file_name = str(datetime.now()).split()[1].replace('.','-').replace(':','-')+'.jpg'
@@ -90,12 +90,21 @@ def makeASnapshot(kamera):
     print(os.getcwd()+'/'+file_name)
 
 
-def snaphot_loop(kamera):
-    if not os.path.exists(kamera.name):
-        os.makedirs(kamera.name)
-    while(True):
-        time.sleep(kamera.snapshot_period)
-        makeASnapshot(kamera)
+def snapshotLoop(kamera):
+    if kamera.snapshot_active:
+        if not os.path.exists(kamera.name):
+            os.makedirs(kamera.name)
+        while(True):
+            makeASnapshot(kamera)
+            time.sleep(kamera.snapshot_period)
+
+def cameraLoop(kamera):
+    if kamera.film_active:
+        if not os.path.exists(kamera.name):
+            os.makedirs(kamera.name)
+        os.system(f'ffmpeg -hide_banner -y -loglevel error -rtsp_transport tcp -use_wallclock_as_timestamps 1 -i {kamera.camera_path} -vcodec copy -acodec copy -f segment -reset_timestamps 1 -segment_time 900 -segment_format mkv -segment_atclocktime 1 -strftime 1 {kamera.name}/%Y%m%dT%H%M%S.mkv')
+    
+
 
 
 
@@ -113,7 +122,13 @@ def runSnapshotThreads(cameras,func):
 def main():
     changeToSaveDirectory(os.getcwd())
     all_cameras = createRtspCameras(getRtspStreams(),getRtspPort(),CameraRTSP)
-    runSnapshotThreads(all_cameras,snaphot_loop)
+
+    settings = {'abc':[True,5],
+            'c':[True,2]}
+    setCameraSnapshotMode(all_cameras,settings)
+
+    runSnapshotThreads(all_cameras,snapshotLoop)
+    runSnapshotThreads(all_cameras,cameraLoop)
     time.sleep(30)
 
 
