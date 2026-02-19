@@ -6,6 +6,7 @@ import threading
 from datetime import date, datetime
 import typer
 from pathlib import Path
+import csv
 
 
 
@@ -13,9 +14,9 @@ class CameraRTSP:
     def __init__(self,name,port_rtsp):
         self.name = name
         self.camera_path = f'rtsp://localhost{port_rtsp}/{name}'
-        self.snapshot_period = 3.0
         self.snapshot_active = True
-        self.film_active = True
+        self.snapshot_period = 5.0
+        self.film_active = False
 
 
 
@@ -80,14 +81,11 @@ def changeToSaveDirectory(snapshots_goto_dir):
 
 
 
-## Nagrywanie streamów
-#
-## os.system('ffmpeg -hide_banner -y -loglevel error -rtsp_transport tcp -use_wallclock_as_timestamps 1 -i rtsp://localhost:8554/c -vcodec libx264 -acodec copy -f segment -reset_timestamps 1 -segment_time 900 -segment_format mp4 -segment_atclocktime 1 -strftime 1 %Y%m%dT%H%M%S.mp4 &')
-
 def makeASnapshot(kamera):
     file_name = str(datetime.now()).split()[1].replace('.','-').replace(':','-')+'.jpg'
     os.system(f'ffmpeg -skip_frame nokey -y -i {kamera.camera_path} -vframes 1 -loglevel panic {kamera.name}/{file_name} &')
     print(os.getcwd()+'/'+file_name)
+
 
 
 def snapshotLoop(kamera):
@@ -98,14 +96,14 @@ def snapshotLoop(kamera):
             makeASnapshot(kamera)
             time.sleep(kamera.snapshot_period)
 
+
+
 def cameraLoop(kamera):
     if kamera.film_active:
         if not os.path.exists(kamera.name):
             os.makedirs(kamera.name)
         os.system(f'ffmpeg -hide_banner -y -loglevel error -rtsp_transport tcp -use_wallclock_as_timestamps 1 -i {kamera.camera_path} -vcodec copy -acodec copy -f segment -reset_timestamps 1 -segment_time 900 -segment_format mkv -segment_atclocktime 1 -strftime 1 {kamera.name}/%Y%m%dT%H%M%S.mkv')
     
-
-
 
 
 # Uruchomienie równoczesnego zapisu z wielu kamer
@@ -118,20 +116,64 @@ def runSnapshotThreads(cameras,func):
         daemony_kamerowe[i].start()
 
 
+def readSetting(csv_path):
+    csv_dict = {}
+    with open(csv_path, 'r') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        for line in csv_reader:
+            print(line[2])
+            csv_dict[line[0]] = {
+            'snapshot_active':line[1],
+            'snapshot_period':float(line[2]),
+            'film_active':line[3]}  
+    return csv_dict
+
+
+def setCameraSettings(cameras,csv_settings):
+    for i in cameras:
+        if i in csv_settings:
+            cameras[i].snapshot_active = csv_settings[i]['snapshot_active']
+            cameras[i].snapshot_period = csv_settings[i]['snapshot_period']
+            cameras[i].film_active = csv_settings[i]['film_active']
+
+
+def writeSettingsTocsv(kameras,csv_settings,csv_path):
+    with open(csv_path, 'w') as csv_file:
+        for i in kameras:
+            csv_writer = csv.writer(csv_file)
+            if i in csv_settings:
+                line = [i,csv_settings[i]['snapshot_active'],csv_settings[i]['snapshot_period'],csv_settings[i]['film_active']]
+                csv_writer.writerow(line)
+            else:
+                line = [kameras[i].name,kameras[i].snapshot_active,kameras[i].snapshot_period,kameras[i].film_active]
+                csv_writer.writerow(line)
+
+def settingsFromUser():
+    ...
+
+
 
 def main():
-    changeToSaveDirectory(os.getcwd())
+
     all_cameras = createRtspCameras(getRtspStreams(),getRtspPort(),CameraRTSP)
+    csv_path = os.path.dirname(os.path.abspath(__file__))+'/settings.csv'
 
-    settings = {'abc':[True,5],
-            'c':[True,2]}
-    setCameraSnapshotMode(all_cameras,settings)
 
-    runSnapshotThreads(all_cameras,snapshotLoop)
-    runSnapshotThreads(all_cameras,cameraLoop)
-    time.sleep(30)
+    writeSettingsTocsv(all_cameras,{},csv_path)
+    
+    run_program = True
+    if run_program:
+        changeToSaveDirectory(os.getcwd())
+        setCameraSettings(all_cameras,readSetting(csv_path))
+        runSnapshotThreads(all_cameras,snapshotLoop)
+        runSnapshotThreads(all_cameras,cameraLoop)
+        time.sleep(4294967)
+
 
 
 
 if __name__=='__main__':
     main()
+
+
+#print(os.path.dirname(os.path.abspath(__file__)))
